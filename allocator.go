@@ -42,10 +42,11 @@ import (
 
 // Default size of the node type, in bytes.
 // This value will be used for allocating memory for node.
-const defaultNodeSize = int(unsafe.Sizeof(node{}))
+const defaultNodeSize = uint32(unsafe.Sizeof(node{}))
 
 // 0 means nil pointer for offsets of Allocator.
-const NilAllocatorOffset = uint32(0)
+const nilAllocatorOffset = uint32(0)
+const initialAllocatorOffset = uint32(1)
 
 // const cacheLineSize = 64
 // const paddingLimit = 15
@@ -62,7 +63,7 @@ type Allocator struct {
 // NewAllocator allocates a buffer with given size and returns a new allocator.
 func NewAllocator(size uint32) *Allocator {
 	// Set initial offset as 1 since 0 is used for nil pointers.
-	return &Allocator{make([]byte, size), 1}
+	return &Allocator{make([]byte, size), initialAllocatorOffset}
 }
 
 // New allocates memory.
@@ -75,7 +76,7 @@ func (allc *Allocator) New(size uint32) uint32 {
 	return newOffset - size
 }
 
-// PutBytes will copy given value into mem.
+// PutBytes will copy given value into mem and returns offset.
 func (allc *Allocator) PutBytes(val []byte) uint32 {
 	valSize := uint32(len(val))
 	// Add padding for increasing cache performance.
@@ -95,10 +96,10 @@ func (allc *Allocator) PutBytesTo(offset uint32, val []byte) {
 
 // MakeNode will allocate required space for node type.
 // The offset of the node in the mem is returned.
-func (allc *Allocator) MakeNode(truncatedSize int) uint32 {
+func (allc *Allocator) MakeNode(truncatedSize uint32) uint32 {
 	// Calculate the amount of actual memory required for this node.
 	// Depending on the height of the node, size might be truncated.
-	size := uint32(defaultNodeSize - truncatedSize)
+	size := defaultNodeSize - truncatedSize
 	/*padding := size % cacheLineSize
 	if padding < paddingLimit {
 		size += padding
@@ -113,8 +114,12 @@ func (allc *Allocator) GetBytes(offset uint32, size uint32) []byte {
 
 // GetNode returns a pointer to the node at offset.
 func (allc *Allocator) GetNode(offset uint32) *node {
-	if offset == NilAllocatorOffset {
+	if offset == nilAllocatorOffset {
 		return nil
 	}
 	return (*node)(unsafe.Pointer(&allc.mem[offset]))
+}
+
+func (allc *Allocator) getOffset() uint32 {
+	return atomic.LoadUint32(&allc.offset)
 }

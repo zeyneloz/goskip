@@ -72,7 +72,7 @@ type SkipList struct {
 func newNode(allc *Allocator, valAllc *Allocator, height uint8, key []byte, val []byte) (*node, uint32) {
 	truncatedSize := (DefaultMaxHeight - int(height)) * LayerSize
 	keyOffset := allc.PutBytes(key)
-	nodeOffset := allc.MakeNode(truncatedSize)
+	nodeOffset := allc.MakeNode(uint32(truncatedSize))
 	valOffset := valAllc.PutBytes(val)
 	node := allc.GetNode(nodeOffset)
 	node.height = height
@@ -183,7 +183,7 @@ func (s *SkipList) getNeighbourNodes(startingNode *node, level uint8, key []byte
 // along with a boolean value which designates whether returned nodes key
 // is equal to given key.
 func (s *SkipList) getClosestNode(key []byte) (*node, bool) {
-	currentNode := s.head // points to current node in loop.
+	currentNode := s.head        // points to current node in loop.
 	level := uint8(s.height - 1) // current level
 	for {
 		nextNodeOffset := currentNode.getNextNodeOffset(level)
@@ -193,7 +193,7 @@ func (s *SkipList) getClosestNode(key []byte) (*node, bool) {
 			// If there are still levels to descend to, go one level lower.
 			// Else, return current node as closest node.
 			if level > 0 {
-				level --
+				level--
 				continue // used here to get rid of nested if/else.
 			}
 			return currentNode, false
@@ -218,7 +218,7 @@ func (s *SkipList) getClosestNode(key []byte) (*node, bool) {
 		// If next node's key is greater than the key we search for,
 		// a) Go one level down in skip list if possible.
 		if level > 0 {
-			level --
+			level--
 			continue // used here to get rid of nested if/else.
 		}
 		// b) Return current node as closest node if this is the base level.
@@ -248,7 +248,7 @@ func (s *SkipList) Set(key []byte, val []byte) {
 
 	// Starting from the highest level, find the suitable position to
 	// put the node for each level.
-	for i := int(listHeight) - 1; i >= 0 ; i-- {
+	for i := int(listHeight) - 1; i >= 0; i-- {
 		prevNodes[i], nextNodesOffsets[i], sameKey = s.getNeighbourNodes(prevNodes[i+1], uint8(i), key)
 		// if there is already a node with the same key, there is no need to
 		// create a new node, just use it.
@@ -324,9 +324,9 @@ func NewSkipList(allocatorSize uint32) *SkipList {
 	var emptyValue []byte
 	head, _ := newNode(mainAllocator, valueAllocator, DefaultMaxHeight, emptyValue, emptyValue)
 	return &SkipList{
-		mainAllocator: mainAllocator,
+		mainAllocator:  mainAllocator,
 		valueAllocator: valueAllocator,
-		height: 0,
-		head: head,
+		height:         0,
+		head:           head,
 	}
 }
