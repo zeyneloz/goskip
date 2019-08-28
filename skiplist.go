@@ -134,6 +134,10 @@ func (s *SkipList) setNodeValue(node *node, val []byte) {
 		node.encodeValue(valOffset, newValSize)
 		return
 	}
+	// If the length of new node is greater than odl node, forget old value
+	// and allocate new space in memory for new value.
+	newOffset := s.valueAllocator.putBytes(val)
+	node.encodeValue(newOffset, newValSize)
 }
 
 // getNeighbourNodes returns nodes (x, y, z, o) where
@@ -312,6 +316,7 @@ func (s *SkipList) randomHeight() uint8 {
 	return uint8(height)
 }
 
+// NewSkipList initializes and returns a skip list instance.
 func NewSkipList(allocatorSize uint32) *SkipList {
 	mainAllocator := newAllocator(allocatorSize)
 	valueAllocator := newAllocator(allocatorSize)
