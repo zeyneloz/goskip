@@ -101,16 +101,10 @@ func (n *node) encodeValue(offset uint32, size uint32) {
 	atomic.StoreUint64(&n.encodedValue, encodedValue)
 }
 
-// Set value offset and size.
+// Returns (offset, size) of value.
 func (n *node) decodeValue() (uint32, uint32) {
 	val := atomic.LoadUint64(&n.encodedValue)
 	return uint32(val >> 32), uint32(val)
-}
-
-// Set key offset and size.
-func (n *node) setKey(offset uint32, size uint16) {
-	n.keyOffset = offset
-	n.keySize = size
 }
 
 // Returns a pointer to node with given offset.
