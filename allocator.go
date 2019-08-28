@@ -60,15 +60,14 @@ type Allocator struct {
 	offset uint32
 }
 
-// NewAllocator allocates a buffer with given size and returns a new allocator.
-func NewAllocator(size uint32) *Allocator {
+// newAllocator allocates a buffer with given size and returns a new allocator.
+func newAllocator(size uint32) *Allocator {
 	// Set initial offset as 1 since 0 is used for nil pointers.
 	return &Allocator{make([]byte, size), initialAllocatorOffset}
 }
 
-// New allocates memory.
-// Offset of the space in the mem is returned.
-func (allc *Allocator) New(size uint32) uint32 {
+// new reserves a block on memory and returns offset to it.
+func (allc *Allocator) new(size uint32) uint32 {
 	// Multiple goroutines might modify offset value.
 	// We need to calculate new offset atomically.
 	// TODO overflow
@@ -76,27 +75,27 @@ func (allc *Allocator) New(size uint32) uint32 {
 	return newOffset - size
 }
 
-// PutBytes will copy given value into mem and returns offset.
-func (allc *Allocator) PutBytes(val []byte) uint32 {
+// putBytes will copy given value into mem and return offset.
+func (allc *Allocator) putBytes(val []byte) uint32 {
 	valSize := uint32(len(val))
 	// Add padding for increasing cache performance.
 	/*padding := valSize % cacheLineSize
 	if padding < paddingLimit {
 		valSize += padding
 	}*/
-	offset := allc.New(valSize)
+	offset := allc.new(valSize)
 	copy(allc.mem[offset:], val)
 	return offset
 }
 
-// PutBytesTo will copy given value into given memory offset.
-func (allc *Allocator) PutBytesTo(offset uint32, val []byte) {
+// putBytesTo will copy given value into given memory offset.
+func (allc *Allocator) putBytesTo(offset uint32, val []byte) {
 	copy(allc.mem[offset:], val)
 }
 
-// MakeNode will allocate required space for node type.
+// makeNode will allocate required space for node type.
 // The offset of the node in the mem is returned.
-func (allc *Allocator) MakeNode(truncatedSize uint32) uint32 {
+func (allc *Allocator) makeNode(truncatedSize uint32) uint32 {
 	// Calculate the amount of actual memory required for this node.
 	// Depending on the height of the node, size might be truncated.
 	size := defaultNodeSize - truncatedSize
@@ -104,16 +103,16 @@ func (allc *Allocator) MakeNode(truncatedSize uint32) uint32 {
 	if padding < paddingLimit {
 		size += padding
 	}*/
-	return allc.New(size)
+	return allc.new(size)
 }
 
-// GetBytes returns byte slice at offset with given size.
-func (allc *Allocator) GetBytes(offset uint32, size uint32) []byte {
+// getBytes returns the byte slice in mem[offset:offset+size]
+func (allc *Allocator) getBytes(offset uint32, size uint32) []byte {
 	return allc.mem[offset : offset+size]
 }
 
-// GetNode returns a pointer to the node at offset.
-func (allc *Allocator) GetNode(offset uint32) *node {
+// getNode returns a pointer to the node at given offset.
+func (allc *Allocator) getNode(offset uint32) *node {
 	if offset == nilAllocatorOffset {
 		return nil
 	}

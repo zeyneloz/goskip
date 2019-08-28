@@ -71,10 +71,10 @@ type SkipList struct {
 // newNode creates a node with given height and returns node and the offset.
 func newNode(allc *Allocator, valAllc *Allocator, height uint8, key []byte, val []byte) (*node, uint32) {
 	truncatedSize := (DefaultMaxHeight - int(height)) * LayerSize
-	keyOffset := allc.PutBytes(key)
-	nodeOffset := allc.MakeNode(uint32(truncatedSize))
-	valOffset := valAllc.PutBytes(val)
-	node := allc.GetNode(nodeOffset)
+	keyOffset := allc.putBytes(key)
+	nodeOffset := allc.makeNode(uint32(truncatedSize))
+	valOffset := valAllc.putBytes(val)
+	node := allc.getNode(nodeOffset)
 	node.height = height
 	node.keyOffset = keyOffset
 	// TODO key length should not exceed uint16 size, assert.
@@ -109,18 +109,18 @@ func (n *node) decodeValue() (uint32, uint32) {
 
 // Returns a pointer to node with given offset.
 func (s *SkipList) getNodeKey(node *node) []byte {
-	return s.mainAllocator.GetBytes(node.keyOffset, uint32(node.keySize))
+	return s.mainAllocator.getBytes(node.keyOffset, uint32(node.keySize))
 }
 
 // Returns a pointer to node with given offset.
 func (s *SkipList) getNodeValue(node *node) []byte {
 	offset, size := node.decodeValue()
-	return s.valueAllocator.GetBytes(offset, size)
+	return s.valueAllocator.getBytes(offset, size)
 }
 
 // Returns a pointer to node with given offset.
 func (s *SkipList) getNode(offset uint32) *node {
-	return s.mainAllocator.GetNode(offset)
+	return s.mainAllocator.getNode(offset)
 }
 
 // Set the value of given node.
@@ -130,7 +130,7 @@ func (s *SkipList) setNodeValue(node *node, val []byte) {
 	// If node currently has a value and the size of the value is bigger than new value,
 	// use previous value's memory for new value.
 	if valSize >= newValSize {
-		s.valueAllocator.PutBytesTo(valOffset, val)
+		s.valueAllocator.putBytesTo(valOffset, val)
 		node.encodeValue(valOffset, newValSize)
 		return
 	}
@@ -313,8 +313,8 @@ func (s *SkipList) randomHeight() uint8 {
 }
 
 func NewSkipList(allocatorSize uint32) *SkipList {
-	mainAllocator := NewAllocator(allocatorSize)
-	valueAllocator := NewAllocator(allocatorSize)
+	mainAllocator := newAllocator(allocatorSize)
+	valueAllocator := newAllocator(allocatorSize)
 	var emptyValue []byte
 	head, _ := newNode(mainAllocator, valueAllocator, DefaultMaxHeight, emptyValue, emptyValue)
 	return &SkipList{

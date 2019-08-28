@@ -35,18 +35,18 @@ var nodesData = []struct {
 // Return value of given node encodedValue in bytes.
 func getNodeValue(allc *Allocator, encodedValue uint64) []byte {
 	val := atomic.LoadUint64(&encodedValue)
-	return allc.GetBytes(uint32(val >> 32), uint32(val))
+	return allc.getBytes(uint32(val >> 32), uint32(val))
 }
 
 // Return key of a node in bytes, using offset and size.
 func getNodeKey(allc *Allocator, offset uint32, size uint16) []byte {
-	return allc.GetBytes(offset, uint32(size))
+	return allc.getBytes(offset, uint32(size))
 }
 
 // createAllocators creates two allocator and returns them.
 func createAllocators(mainSize uint32, valSize uint32) (*Allocator, *Allocator) {
-	mainAllocator := NewAllocator(mainSize)
-	valueAllocator := NewAllocator(valSize)
+	mainAllocator := newAllocator(mainSize)
+	valueAllocator := newAllocator(valSize)
 	return mainAllocator, valueAllocator
 }
 
