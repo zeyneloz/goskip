@@ -111,7 +111,7 @@ func TestAllocator_MakeNode(t *testing.T) {
 	t.Run("ValidNode", func(t *testing.T) {
 		offset := a.MakeNode(0)
 		node := (*node)(unsafe.Pointer(&a.mem[offset]))
-		assert.Equal(t, node.height, node.height, "Smoke test for allocated node")
+		assert.Equal(t, uint8(0), node.height, "Smoke test for allocated node")
 	})
 }
 
@@ -122,7 +122,7 @@ func TestAllocator_MakeNode_Parallel(t *testing.T) {
 			t.Parallel()
 			offset := a.MakeNode(0)
 			node := (*node)(unsafe.Pointer(&a.mem[offset]))
-			assert.Equal(t, node.height, node.height, "Smoke test for node - parallel")
+			assert.Equal(t, uint8(0), node.height, "Smoke test for node - parallel")
 		})
 	}
 }
@@ -157,7 +157,7 @@ func TestAllocator_GetNode(t *testing.T) {
 	for i := 0; i < 400; i++ {
 		offset := a.MakeNode(0)
 		node := a.GetNode(offset)
-		assert.Equal(t, node.height, node.height, "Smoke test for GetNode")
+		assert.Equal(t, uint8(0), node.height, "Smoke test for GetNode")
 	}
 }
 
@@ -168,7 +168,7 @@ func TestAllocator_GetNode_Parallel(t *testing.T) {
 			t.Parallel()
 			offset := a.MakeNode(0)
 			node := a.GetNode(offset)
-			assert.Equal(t, node.height, node.height, "Smoke test for GetNode - parallel")
+			assert.Equal(t, uint8(0), node.height, "Smoke test for GetNode - parallel")
 		})
 	}
 }
