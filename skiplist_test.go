@@ -2,6 +2,7 @@ package goskip
 
 import (
 	"fmt"
+	"reflect"
 	"sync/atomic"
 	"testing"
 
@@ -10,17 +11,17 @@ import (
 
 // default allocator size for both main and value allocator.
 // 128 KB
-const defaultAllocatorSize = uint32(2 << 17)
+const defaultAllocatorSize = uint32(1 << 17)
 
 // An empty long value to be used in tests.
-var longValue = [2 << 10]byte{}
+var longValue = [1 << 10]byte{}
 
 // Sample node data for tests.
 // Assumptions:
 //  - length of the values are greater than 1.
 //  - keys are unique among nodes.
 //  = height can not exceed DefaultMaxHeight.
-var nodesData = []struct {
+var uniqueNodesData = []struct {
 	key    []byte
 	val    []byte
 	height uint8
@@ -37,6 +38,37 @@ var nodesData = []struct {
 	{[]byte("1key"), []byte("11"), uint8(16)},
 	{[]byte("5key"), []byte("55"), uint8(7)},
 	{[]byte("3key"), []byte("33"), uint8(4)},
+}
+
+// sample data with duplicates
+var sampleNodesData = []struct {
+	key []byte
+	val []byte
+}{
+	{[]byte("key1"), []byte("value1")},
+	{[]byte("key44"), []byte("value44")},
+	{[]byte("key23"), []byte("value23")},
+	{[]byte("key5"), []byte("value5")},
+	{[]byte("key102"), []byte("value102")},
+	{[]byte("key65"), []byte("value65")},
+	{[]byte("key68"), []byte("value58")},
+	{[]byte("key23"), []byte("value23-new")},
+	{[]byte("key40"), []byte("value40")},
+	{[]byte("key54"), []byte("value54")},
+	{[]byte("key0"), []byte("value0")},
+	{[]byte("key13"), []byte("value13")},
+	{[]byte("key13"), []byte("value13-new")},
+}
+
+var sampleNodesNeighbors = []struct {
+	key []byte
+	leftNeighbor []byte
+}{
+	{[]byte("key45"), []byte("key44")},
+	{[]byte("key23"), []byte("key23")},
+	{[]byte("key4"), []byte("key23")},
+	{[]byte("key99"), []byte("key68")},
+	{[]byte("key12"), []byte("key102")},
 }
 
 // Return value of given node encodedValue in bytes.
@@ -59,7 +91,7 @@ func createAllocators(mainSize uint32, valSize uint32) (*Allocator, *Allocator) 
 
 func TestNewNode(t *testing.T) {
 	keyAllc, valAllc := createAllocators(defaultAllocatorSize, defaultAllocatorSize)
-	for i, data := range nodesData {
+	for i, data := range uniqueNodesData {
 		t.Run(fmt.Sprintf("Test-%d", i), func(t *testing.T) {
 			node, _ := newNode(keyAllc, valAllc, data.height, data.key, data.val)
 			assert.Equal(t, data.height, node.height, "Height must be initialized correctly.")
@@ -73,7 +105,7 @@ func TestNewNode(t *testing.T) {
 
 func TestNewNode_Parallel(t *testing.T) {
 	keyAllc, valAllc := createAllocators(defaultAllocatorSize, defaultAllocatorSize)
-	for i, data := range nodesData {
+	for i, data := range uniqueNodesData {
 		t.Run(fmt.Sprintf("Test-%d", i), func(t *testing.T) {
 			t.Parallel()
 			node, _ := newNode(keyAllc, valAllc, data.height, data.key, data.val)
@@ -88,7 +120,7 @@ func TestNewNode_Parallel(t *testing.T) {
 
 func TestNode_GetNextNodeOffset(t *testing.T) {
 	keyAllc, valAllc := createAllocators(defaultAllocatorSize, defaultAllocatorSize)
-	node, _ := newNode(keyAllc, valAllc, nodesData[0].height, nodesData[0].key, nodesData[0].val)
+	node, _ := newNode(keyAllc, valAllc, uniqueNodesData[0].height, uniqueNodesData[0].key, uniqueNodesData[0].val)
 	node.layers[0] = 3
 	node.layers[1] = 65
 	node.layers[5] = 4441
@@ -99,7 +131,7 @@ func TestNode_GetNextNodeOffset(t *testing.T) {
 
 func TestNode_EncodeValue(t *testing.T) {
 	keyAllc, valAllc := createAllocators(defaultAllocatorSize, defaultAllocatorSize)
-	node, _ := newNode(keyAllc, valAllc, nodesData[0].height, nodesData[0].key, nodesData[0].val)
+	node, _ := newNode(keyAllc, valAllc, uniqueNodesData[0].height, uniqueNodesData[0].key, uniqueNodesData[0].val)
 	offset := uint32(2 << 7)
 	size := uint32(2<<12) + 1
 	node.encodeValue(offset, size)
@@ -110,7 +142,7 @@ func TestNode_EncodeValue(t *testing.T) {
 
 func TestNode_DecodeValue(t *testing.T) {
 	keyAllc, valAllc := createAllocators(defaultAllocatorSize, defaultAllocatorSize)
-	node, _ := newNode(keyAllc, valAllc, nodesData[0].height, nodesData[0].key, nodesData[0].val)
+	node, _ := newNode(keyAllc, valAllc, uniqueNodesData[0].height, uniqueNodesData[0].key, uniqueNodesData[0].val)
 	offset := uint32(2 << 7)
 	size := uint32(2<<12) + 1
 	node.encodeValue(offset, size)
@@ -129,7 +161,7 @@ func TestNewSkipList(t *testing.T) {
 
 func TestSkipList_GetNode(t *testing.T) {
 	s := NewSkipList(defaultAllocatorSize)
-	for i, data := range nodesData {
+	for i, data := range uniqueNodesData {
 		t.Run(fmt.Sprintf("Test-%d", i), func(t *testing.T) {
 			node, offset := newNode(s.mainAllocator, s.valueAllocator, data.height, data.key, data.val)
 			assert.Equal(t, node, s.getNode(offset))
@@ -139,7 +171,7 @@ func TestSkipList_GetNode(t *testing.T) {
 
 func TestSkipList_GetNode_Parallel(t *testing.T) {
 	s := NewSkipList(defaultAllocatorSize)
-	for i, data := range nodesData {
+	for i, data := range uniqueNodesData {
 		t.Run(fmt.Sprintf("Test-%d", i), func(t *testing.T) {
 			t.Parallel()
 			node, offset := newNode(s.mainAllocator, s.valueAllocator, data.height, data.key, data.val)
@@ -150,7 +182,7 @@ func TestSkipList_GetNode_Parallel(t *testing.T) {
 
 func TestSkipList_GetNodeKey(t *testing.T) {
 	s := NewSkipList(defaultAllocatorSize)
-	for i, data := range nodesData {
+	for i, data := range uniqueNodesData {
 		t.Run(fmt.Sprintf("Test-%d", i), func(t *testing.T) {
 			node, _ := newNode(s.mainAllocator, s.valueAllocator, data.height, data.key, data.val)
 			assert.Equal(t, data.key, s.getNodeKey(node))
@@ -160,7 +192,7 @@ func TestSkipList_GetNodeKey(t *testing.T) {
 
 func TestSkipList_GetNodeKey_Parallel(t *testing.T) {
 	s := NewSkipList(defaultAllocatorSize)
-	for i, data := range nodesData {
+	for i, data := range uniqueNodesData {
 		t.Run(fmt.Sprintf("Test-%d", i), func(t *testing.T) {
 			t.Parallel()
 			node, _ := newNode(s.mainAllocator, s.valueAllocator, data.height, data.key, data.val)
@@ -171,7 +203,7 @@ func TestSkipList_GetNodeKey_Parallel(t *testing.T) {
 
 func TestSkipList_GetNodeValue(t *testing.T) {
 	s := NewSkipList(defaultAllocatorSize)
-	for i, data := range nodesData {
+	for i, data := range uniqueNodesData {
 		t.Run(fmt.Sprintf("Test-%d", i), func(t *testing.T) {
 			node, _ := newNode(s.mainAllocator, s.valueAllocator, data.height, data.key, data.val)
 			assert.Equal(t, data.val, s.getNodeValue(node))
@@ -181,7 +213,7 @@ func TestSkipList_GetNodeValue(t *testing.T) {
 
 func TestSkipList_GetNodeValue_Parallel(t *testing.T) {
 	s := NewSkipList(defaultAllocatorSize)
-	for i, data := range nodesData {
+	for i, data := range uniqueNodesData {
 		t.Run(fmt.Sprintf("Test-%d", i), func(t *testing.T) {
 			t.Parallel()
 			node, _ := newNode(s.mainAllocator, s.valueAllocator, data.height, data.key, data.val)
@@ -193,7 +225,7 @@ func TestSkipList_GetNodeValue_Parallel(t *testing.T) {
 func TestSkipList_SetNodeValue(t *testing.T) {
 	s := NewSkipList(defaultAllocatorSize)
 	// Run for the case that length of new value is less than length of old value.
-	for i, data := range nodesData {
+	for i, data := range uniqueNodesData {
 		t.Run(fmt.Sprintf("Test-%d", i), func(t *testing.T) {
 			node, _ := newNode(s.mainAllocator, s.valueAllocator, data.height, data.key, data.val)
 			newVal := data.val[1:]
@@ -202,7 +234,7 @@ func TestSkipList_SetNodeValue(t *testing.T) {
 		})
 	}
 	// Run for the case that length of new value is greater than length of old value.
-	for i, data := range nodesData {
+	for i, data := range uniqueNodesData {
 		t.Run(fmt.Sprintf("Test-%d", i), func(t *testing.T) {
 			node, _ := newNode(s.mainAllocator, s.valueAllocator, data.height, data.key, data.val)
 			newVal := append([]byte("new-"), data.val...)
@@ -215,7 +247,7 @@ func TestSkipList_SetNodeValue(t *testing.T) {
 func TestSkipList_SetNodeValue_Parallel(t *testing.T) {
 	s := NewSkipList(defaultAllocatorSize)
 	// Run for the case that length of new value is less than length of old value.
-	for i, data := range nodesData {
+	for i, data := range uniqueNodesData {
 		t.Run(fmt.Sprintf("Test-%d", i), func(t *testing.T) {
 			t.Parallel()
 			node, _ := newNode(s.mainAllocator, s.valueAllocator, data.height, data.key, data.val)
@@ -225,13 +257,100 @@ func TestSkipList_SetNodeValue_Parallel(t *testing.T) {
 		})
 	}
 	// Run for the case that length of new value is greater than length of old value.
-	for i, data := range nodesData {
+	for i, data := range uniqueNodesData {
 		t.Run(fmt.Sprintf("Test-%d", i), func(t *testing.T) {
 			t.Parallel()
 			node, _ := newNode(s.mainAllocator, s.valueAllocator, data.height, data.key, data.val)
 			newVal := append([]byte("new-"), data.val...)
 			s.setNodeValue(node, newVal)
 			assert.Equal(t, newVal, s.getNodeValue(node))
+		})
+	}
+}
+
+// Returns true if given key is in the skip list.
+// Just scan the first level as linked list
+func isKeyInList(s *SkipList, key []byte) bool {
+	offset := s.head.getNextNodeOffset(0)
+	node := s.getNode(offset)
+	for node != nil {
+		nodeKey := s.getNodeKey(node)
+		if reflect.DeepEqual(key, nodeKey) {
+			return true
+		}
+		offset = node.getNextNodeOffset(0)
+		node = s.getNode(offset)
+	}
+	return false
+}
+
+func TestSkipList_Set(t *testing.T) {
+	s := NewSkipList(defaultAllocatorSize)
+	for i, data := range uniqueNodesData {
+		t.Run(fmt.Sprintf("Test-%d", i), func(t *testing.T) {
+			s.Set(data.key, data.val)
+			assert.Equal(t, true, isKeyInList(s, data.key))
+		})
+	}
+}
+
+func TestSkipList_Set_Parallel(t *testing.T) {
+	s := NewSkipList(defaultAllocatorSize)
+	for i, data := range uniqueNodesData {
+		t.Run(fmt.Sprintf("Test-%d", i), func(t *testing.T) {
+			t.Parallel()
+			s.Set(data.key, data.val)
+			assert.Equal(t, true, isKeyInList(s, data.key))
+		})
+	}
+}
+
+func TestSkipList_SetGet(t *testing.T) {
+	s := NewSkipList(defaultAllocatorSize)
+	for i, data := range sampleNodesData {
+		t.Run(fmt.Sprintf("Test-%d", i), func(t *testing.T) {
+			s.Set(data.key, data.val)
+			assert.Equal(t, data.val, s.Get(data.key))
+		})
+	}
+}
+
+func TestSkipList_SetGet_Parallel(t *testing.T) {
+	s := NewSkipList(defaultAllocatorSize)
+	for i, data := range uniqueNodesData {
+		t.Run(fmt.Sprintf("Test-%d", i), func(t *testing.T) {
+			t.Parallel()
+			s.Set(data.key, data.val)
+			assert.Equal(t, data.val, s.Get(data.key))
+		})
+	}
+}
+
+func TestSkipList_GetNeighbourNodes(t *testing.T) {
+	s := NewSkipList(defaultAllocatorSize)
+	for _, data := range sampleNodesData {
+		s.Set(data.key, data.val)
+	}
+	for i, data := range sampleNodesNeighbors {
+		t.Run(fmt.Sprintf("Test-%d", i), func(t *testing.T) {
+			node, _, _ := s.getNeighbourNodes(s.head, 0, data.key)
+			key := s.getNodeKey(node)
+			assert.Equal(t, data.leftNeighbor, key)
+		})
+	}
+}
+
+func TestSkipList_GetNeighbourNodes_Parallel(t *testing.T) {
+	s := NewSkipList(defaultAllocatorSize)
+	for _, data := range sampleNodesData {
+		s.Set(data.key, data.val)
+	}
+	for i, data := range sampleNodesNeighbors {
+		t.Run(fmt.Sprintf("Test-%d", i), func(t *testing.T) {
+			t.Parallel()
+			node, _, _ := s.getNeighbourNodes(s.head, 0, data.key)
+			key := s.getNodeKey(node)
+			assert.Equal(t, data.leftNeighbor, key)
 		})
 	}
 }
