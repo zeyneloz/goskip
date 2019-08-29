@@ -119,6 +119,7 @@ func (s *SkipList) getNodeValue(node *node) []byte {
 }
 
 // Returns a pointer to node with given offset.
+// Returns nil if given offset is nilAllocatorOffset.
 func (s *SkipList) getNode(offset uint32) *node {
 	return s.mainAllocator.getNode(offset)
 }
@@ -140,18 +141,12 @@ func (s *SkipList) setNodeValue(node *node, val []byte) {
 	node.encodeValue(newOffset, newValSize)
 }
 
-// getNeighbourNodes returns nodes (x, y, z, o) where
-// x and y are nodes and asserts x.key <= key <= y.key for given level.
-// z is the hint node for upper level, it can be used as startingNode.
-// z must have a key less than or equal to `key`.
-// o is the offset of y.
+// getNeighbourNodes returns nodes (x, y, z) where
+// x is the right most node asserts x.key <= key.
+// y is the offset of next node of x, on this level.
+// z is true whenever x.key = key
 // startingNode is used as starting point for search (hint from previous calls.)
 // Key of the startingNode always must be less then given key.
-// Return value meanings for (x, y):
-//  1) (node1, nil) -> node1.key < key and node1 is the last element on this level.
-//  2) (node1, node1) -> node1.key = key
-//  3) (node1, node2) => node1.key < key < node2.key
-// Important Node: this function assumes that it will be called from bottom level to up level.
 func (s *SkipList) getNeighbourNodes(startingNode *node, level uint8, key []byte) (*node, uint32, bool) {
 	currentNode := startingNode
 	for {
@@ -224,8 +219,8 @@ func (s *SkipList) getClosestNode(key []byte) (*node, bool) {
 	}
 }
 
-// Get returns value for given key if exists,
-// Returns nil otherwise.
+// Get returns value for given key if it exists,
+// returns nil otherwise.
 func (s *SkipList) Get(key []byte) []byte {
 	node, found := s.getClosestNode(key)
 	if !found {
@@ -234,7 +229,7 @@ func (s *SkipList) Get(key []byte) []byte {
 	return s.getNodeValue(node)
 }
 
-// Set the value of a key.
+// Set inserts given key-value pair into list.
 func (s *SkipList) Set(key []byte, val []byte) {
 	listHeight := s.getHeight()
 
@@ -296,11 +291,12 @@ func (s *SkipList) Set(key []byte, val []byte) {
 
 }
 
-// casNextNodeOffset sets the offset of next node on a level, using cas operation.
+// casHeight performs cas operation on list height.
 func (s *SkipList) casHeight(old uint32, new uint32) bool {
 	return atomic.CompareAndSwapUint32(&s.height, old, new)
 }
 
+// getHeight returns the maximum height of its nodes.
 func (s *SkipList) getHeight() uint32 {
 	// Height can be modified concurrently, so we need to load it atomically.
 	return atomic.LoadUint32(&s.height)
