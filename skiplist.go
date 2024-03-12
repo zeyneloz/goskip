@@ -229,6 +229,11 @@ func (s *SkipList) Get(key []byte) []byte {
 	return s.getNodeValue(node)
 }
 
+func (s *SkipList) GetCloseNode(key []byte) ([]byte, bool) {
+	node, found := s.getClosestNode(key)
+	return s.getNodeValue(node), found
+}
+
 // Set inserts given key-value pair into list.
 func (s *SkipList) Set(key []byte, val []byte) {
 	listHeight := s.getHeight()
